@@ -1,5 +1,5 @@
 void timeTick() {
-  if (ESP_MODE == 1) {    
+  if (wifiConnected) {    
     if (timeTimer.isReady()) {
       timeClient.update();
       byte thisDay = timeClient.getDay();
@@ -8,12 +8,12 @@ void timeTick() {
       thisTime = timeClient.getHours() * 60 + timeClient.getMinutes();
 
       // проверка рассвета
-      if (alarm[thisDay].state &&                                       // день будильника
-          thisTime >= (alarm[thisDay].time - dawnOffsets[dawnMode]) &&  // позже начала
-          thisTime < (alarm[thisDay].time + DAWN_TIMEOUT) ) {                      // раньше конца + минута
+      if (my_alarm[thisDay].state &&                                       // день будильника
+          thisTime >= (my_alarm[thisDay].time - dawnOffsets[dawnMode]) &&  // позже начала
+          thisTime < (my_alarm[thisDay].time + DAWN_TIMEOUT) ) {                      // раньше конца + минута
         if (!manualOff) {
           // величина рассвета 0-255
-          int dawnPosition = 255 * ((float)(thisTime - (alarm[thisDay].time - dawnOffsets[dawnMode])) / dawnOffsets[dawnMode]);
+          int dawnPosition = 255 * ((float)(thisTime - (my_alarm[thisDay].time - dawnOffsets[dawnMode])) / dawnOffsets[dawnMode]);
           dawnPosition = constrain(dawnPosition, 0, 255);
           CHSV dawnColor = CHSV(map(dawnPosition, 0, 255, 10, 35),
                                 map(dawnPosition, 0, 255, 255, 170),

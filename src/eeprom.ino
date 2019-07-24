@@ -14,8 +14,8 @@ void eepromTick() {
 }
 
 void saveAlarm(byte almNumber) {
-  EEPROM.write(5 * almNumber, alarm[almNumber].state);   // рассвет
-  eeWriteInt(5 * almNumber + 1, alarm[almNumber].time);
+  EEPROM.write(5 * almNumber, my_alarm[almNumber].state);   // рассвет
+  eeWriteInt(5 * almNumber + 1, my_alarm[almNumber].time);
   EEPROM.commit();
 }
 

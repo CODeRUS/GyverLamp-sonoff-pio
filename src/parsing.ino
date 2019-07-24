@@ -46,14 +46,14 @@ void parseUDP() {
       byte alarmNum = (char)inputBuffer[7] - '0';
       alarmNum -= 1;
       if (inputBuffer.indexOf("ON") != -1) {
-        alarm[alarmNum].state = true;
+        my_alarm[alarmNum].state = true;
         inputBuffer = "alm #" + String(alarmNum + 1) + " ON";
       } else if (inputBuffer.indexOf("OFF") != -1) {
-        alarm[alarmNum].state = false;
+        my_alarm[alarmNum].state = false;
         inputBuffer = "alm #" + String(alarmNum + 1) + " OFF";
       } else {
         int almTime = inputBuffer.substring(8).toInt();
-        alarm[alarmNum].time = almTime;
+        my_alarm[alarmNum].time = almTime;
         byte hour = floor(almTime / 60);
         byte minute = almTime - hour * 60;
         inputBuffer = "alm #" + String(alarmNum + 1) +
@@ -71,7 +71,11 @@ void parseUDP() {
     char reply[inputBuffer.length() + 1];
     inputBuffer.toCharArray(reply, inputBuffer.length() + 1);
     Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
+#if defined(ESP8266)
     Udp.write(reply);
+#else
+  Udp.print(reply);
+#endif
     Udp.endPacket();
   }
 }
@@ -93,11 +97,11 @@ void sendCurrent() {
 void sendAlarms() {
   inputBuffer = "ALMS ";
   for (byte i = 0; i < 7; i++) {
-    inputBuffer += String(alarm[i].state);
+    inputBuffer += String(my_alarm[i].state);
     inputBuffer += " ";
   }
   for (byte i = 0; i < 7; i++) {
-    inputBuffer += String(alarm[i].time);
+    inputBuffer += String(my_alarm[i].time);
     inputBuffer += " ";
   }
   inputBuffer += (dawnMode + 1);

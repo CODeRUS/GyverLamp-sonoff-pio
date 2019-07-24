@@ -18,8 +18,6 @@
 
 // ============= НАСТРОЙКИ =============
 
-#define ESP_MODE 1
-
 // -------- ВРЕМЯ -------
 #define GMT 3              // смещение (москва 3)
 #define NTP_ADDRESS  "europe.pool.ntp.org"    // сервер времени
@@ -44,8 +42,12 @@
 // шпаргалка по настройке матрицы здесь! https://alexgyver.ru/matrix_guide/
 
 // ============= ДЛЯ РАЗРАБОТЧИКОВ =============
+#if defined(SONOFF)
 #define LED_PIN 14             // пин ленты
-#define BTN_PIN 4
+#else
+#define LED_PIN 13             // пин ленты
+#endif
+#define BTN_PIN 15
 #define MODE_AMOUNT 18
 
 #define NUM_LEDS WIDTH * HEIGHT
@@ -53,18 +55,30 @@
 // ---------------- БИБЛИОТЕКИ -----------------
 // #define FASTLED_INTERRUPT_RETRY_COUNT 0
 // #define FASTLED_ALLOW_INTERRUPTS 0
+#if defined(ESP8266)
 #define FASTLED_ESP8266_RAW_PIN_ORDER
+#endif
 #define NTP_INTERVAL 60 * 1000    // обновление (1 минута)
 
 #include "timerMinim.h"
 #include <FastLED.h>
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>
+#else
+#include <WiFi.h>
+#endif
 #include <DNSServer.h>
 #include <WiFiManager.h>
 #include <WiFiUdp.h>
 #include <EEPROM.h>
 #include <NTPClient.h>
 #include <GyverButton.h>
+
+#include <ArduinoOTA.h>
+
+#ifndef UDP_TX_PACKET_MAX_SIZE
+#define UDP_TX_PACKET_MAX_SIZE 15
+#endif
 
 // ------------------- ТИПЫ --------------------
 CRGB leds[NUM_LEDS];
@@ -88,7 +102,7 @@ struct {
 struct {
   boolean state = false;
   int time = 0;
-} alarm[7];
+} my_alarm[7];
 
 byte dawnOffsets[] = {5, 10, 15, 20, 25, 30, 40, 50, 60};
 byte dawnMode;
@@ -107,9 +121,10 @@ boolean settChanged = false;
 
 unsigned char matrixValue[8][16];
 
+bool wifiConnected = false;
 void setup() {
   // ESP.wdtDisable();
-  ESP.wdtEnable(0);
+  // ESP.wdtEnable(0);
 
   // ЛЕНТА
   FastLED.addLeds<WS2812B, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS)/*.setCorrection( TypicalLEDStrip )*/;
@@ -127,10 +142,11 @@ void setup() {
   wifiManager.setConfigPortalBlocking(false);
   if (wifiManager.autoConnect("Fire Lamp", "")) {
     Serial.println("connected...yeey :)");
+    wifiConnected = true;
   } else {
     Serial.println("non blocking config portal running");
+    wifiManager.startConfigPortal("Fire Lamp AP", "ondemand");
   }
-  wifiManager.startConfigPortal("Fire Lamp AP", "ondemand");
 
   Serial.println("local ip");
   Serial.println(WiFi.localIP());
@@ -150,8 +166,8 @@ void setup() {
       EEPROM.commit();
     }
     for (byte i = 0; i < 7; i++) {
-      EEPROM.write(5 * i, alarm[i].state);   // рассвет
-      eeWriteInt(5 * i + 1, alarm[i].time);
+      EEPROM.write(5 * i, my_alarm[i].state);   // рассвет
+      eeWriteInt(5 * i + 1, my_alarm[i].time);
       EEPROM.commit();
     }
     EEPROM.write(199, 0);   // рассвет
@@ -162,8 +178,8 @@ void setup() {
     EEPROM.get(3 * i + 40, modes[i]);
   }
   for (byte i = 0; i < 7; i++) {
-    alarm[i].state = EEPROM.read(5 * i);
-    alarm[i].time = eeGetInt(5 * i + 1);
+    my_alarm[i].state = EEPROM.read(5 * i);
+    my_alarm[i].time = eeGetInt(5 * i + 1);
   }
   dawnMode = EEPROM.read(199);
   currentMode = (int8_t)EEPROM.read(200);
@@ -173,7 +189,11 @@ void setup() {
   char reply[inputBuffer.length() + 1];
   inputBuffer.toCharArray(reply, inputBuffer.length() + 1);
   Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
+#if defined(ESP8266)
   Udp.write(reply);
+#else
+  Udp.print(reply);
+#endif
   Udp.endPacket();
 
   timeClient.begin();
@@ -183,13 +203,17 @@ void setup() {
 }
 
 void loop() {
-  wifiManager.process();
+  if (wifiConnected) {    
+    server.handleClient();
+  } else {
+    wifiManager.process();
+  }
   parseUDP();
   effectsTick();
   eepromTick();
   timeTick();
   buttonTick();
-  ESP.wdtFeed();   // пнуть собаку
+  // ESP.wdtFeed();   // пнуть собаку
   yield();
 }
 
